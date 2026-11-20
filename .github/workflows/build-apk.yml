@@ -41,7 +41,22 @@ jobs:
           set -euo pipefail
           INDEX="$(find "$GITHUB_WORKSPACE" -type f -path '*/public/index.html' -not -path '*/node_modules/*' -not -path "*/$APP_DIR/*" -print -quit)"
           if [ -z "$INDEX" ]; then
-            echo "::error::Nie znaleziono public/index.html w repozytorium. Wgraj do repo pliki komunikatora (folder public)."
+            echo "Brak folderu public w repo - szukam archiwum ZIP z komunikatorem..."
+            ZIP=""
+            while IFS= read -r -d '' F; do
+              LIST="$(unzip -Z1 "$F" 2>/dev/null || true)"
+              if grep -Eq '(^|/)public/index\.html$' <<< "$LIST"; then ZIP="$F"; break; fi
+            done < <(find "$GITHUB_WORKSPACE" -type f -iname '*.zip' -not -path '*/.git/*' -print0)
+            if [ -n "$ZIP" ]; then
+              echo "Znaleziono archiwum: $ZIP"
+              rm -rf "$RUNNER_TEMP/src"
+              mkdir -p "$RUNNER_TEMP/src"
+              unzip -q "$ZIP" -d "$RUNNER_TEMP/src"
+              INDEX="$(find "$RUNNER_TEMP/src" -type f -path '*/public/index.html' -print -quit)"
+            fi
+          fi
+          if [ -z "$INDEX" ]; then
+            echo "::error::Nie znaleziono public/index.html ani ZIP-a z komunikatorem (glass-messenger-v3.zip)."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -not -path '*/.git/*' | head -50
             exit 1
           fi
