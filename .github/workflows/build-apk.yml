@@ -12,7 +12,6 @@ permissions:
 
 env:
   # >>> WPISZ ADRES SWOJEGO HOSTINGU Z KOMUNIKATOREM <<<
-  SERVER_URL: "https://TWOJA-DOMENA.pl"
   APP_NAME: "GlassTalk"
   APP_ID: "com.glasstalk.app"
   APP_DIR: "capacitor-apk"
