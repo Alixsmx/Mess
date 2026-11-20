@@ -11,7 +11,6 @@ permissions:
   contents: read
 
 env:
-  # >>> WPISZ ADRES SWOJEGO HOSTINGU Z KOMUNIKATOREM <<<
   APP_NAME: "GlassTalk"
   APP_ID: "com.glasstalk.app"
   APP_DIR: "capacitor-apk"
@@ -24,18 +23,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
-      - name: Check server URL
-        shell: bash
-        run: |
-          case "$SERVER_URL" in
-            http://*|https://*) ;;
-            *) echo "::error::SERVER_URL musi zaczynac sie od http:// lub https://"; exit 1 ;;
-          esac
-          if echo "$SERVER_URL" | grep -q "TWOJA-DOMENA"; then
-            echo "::error::Wpisz adres hostingu w pliku yml (pole SERVER_URL na samej gorze)."
-            exit 1
-          fi
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -52,7 +39,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          INDEX="$(find "$GITHUB_WORKSPACE" -type f -path '*/public/index.html' -not -path '*/node_modules/*' -not -path "*/$APP_DIR/*" -print -quit)"
+          if [ -z "$INDEX" ]; then
+            echo "::error::Nie znaleziono public/index.html w repozytorium. Wgraj do repo pliki komunikatora (folder public)."
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -not -path '*/.git/*' | head -50
+            exit 1
+          fi
+          PUB="$(dirname "$INDEX")"
+          echo "Znaleziono aplikacje: $PUB"
           mkdir -p "$APP_DIR/www"
+          cp -r "$PUB"/. "$APP_DIR/www/"
           cd "$APP_DIR"
           cat > package.json <<EOF
           {
@@ -76,7 +72,6 @@ jobs:
             "appName": "$APP_NAME",
             "webDir": "www",
             "server": {
-              "url": "$SERVER_URL",
               "cleartext": true
             },
             "android": {
@@ -84,8 +79,8 @@ jobs:
             }
           }
           EOF
-          printf '<!doctype html><meta charset="utf-8"><title>%s</title>\n' "$APP_NAME" > www/index.html
           node -e "JSON.parse(require('fs').readFileSync('package.json'));JSON.parse(require('fs').readFileSync('capacitor.config.json'));console.log('Konfiguracja OK')"
+          ls -la www
 
       - name: Install Android SDK
         shell: bash
@@ -110,6 +105,8 @@ jobs:
           set -euo pipefail
           npm install --no-audit --no-fund
           npx cap add android
+          MAN=android/app/src/main/AndroidManifest.xml
+          grep -q usesCleartextTraffic "$MAN" || sed -i 's/<application/<application android:usesCleartextTraffic="true"/' "$MAN"
           npx cap sync android
 
       - name: Set up Gradle
